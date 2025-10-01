@@ -73,50 +73,46 @@ client.on(Events.MessageCreate, async (message) => {
     return message.reply("🏓 Pong!");
   }
 
-  // Thống kê thời gian
-  if (message.content === "!status") {
-    if (totalTimes.size === 0 && sessions.size === 0) {
-      return message.channel.send("📭 Hôm nay chưa có ai tham gia voice channel.");
-    }
-
-    let result = "📊 Thống kê hôm nay:\n";
-
-    // Cộng thêm thời gian hiện tại của những người còn đang trong room
-    for (const [id, data] of sessions.entries()) {
-      const extra = Math.floor((Date.now() - data.start) / 1000 / 60);
-      totalTimes.set(id, (totalTimes.get(id) || 0) + extra);
-      sessions.set(id, { start: Date.now(), channel: data.channel });
-    }
-
-    for (const [id, minutes] of totalTimes.entries()) {
-      result += `👤 <@${id}>: ${minutes} phút\n`;
-    }
-
-    message.channel.send(result);
+// Thống kê thời gian theo role
+if (message.content === "!status") {
+  if (totalTimes.size === 0 && sessions.size === 0) {
+    return message.channel.send("📭 Hôm nay chưa có ai tham gia voice channel.");
   }
 
-  // Hiển thị user theo role
-  if (message.content === "!users") {
-    const guild = message.guild;
-    await guild.members.fetch(); // fetch toàn bộ member (nếu chưa cache)
+  const guild = message.guild;
+  await guild.members.fetch(); // load toàn bộ member
 
-    const roles = ["F3", "F4", "F6", "F7"];
-    let result = "📌 Danh sách User theo Role:\n";
+  const roles = ["F3", "F4", "F6", "F7"];
+  let result = "📊 **Thống kê hôm nay (theo Role):**\n";
 
-    for (const roleName of roles) {
-      const role = guild.roles.cache.find((r) => r.name === roleName);
-      if (!role) {
-        result += `❌ Không tìm thấy role **${roleName}**\n`;
-        continue;
-      }
+  // Cộng thêm thời gian của những người đang ngồi
+  for (const [id, data] of sessions.entries()) {
+    const extra = Math.floor((Date.now() - data.start) / 1000 / 60);
+    totalTimes.set(id, (totalTimes.get(id) || 0) + extra);
+    sessions.set(id, { start: Date.now(), channel: data.channel });
+  }
 
-      const members = role.members.map((m) => `<@${m.user.id}>`);
-      result += `\n**${roleName}** (${members.length}):\n`;
-      result += members.length > 0 ? members.join(", ") : "👉 Trống\n";
+  // Duyệt qua từng role
+  for (const roleName of roles) {
+    const role = guild.roles.cache.find((r) => r.name === roleName);
+    if (!role) {
+      result += `\n❌ Không tìm thấy role **${roleName}**\n`;
+      continue;
     }
 
-    message.channel.send(result);
+    let membersData = [];
+    for (const member of role.members.values()) {
+      const minutes = totalTimes.get(member.id) || 0;
+      membersData.push(`- <@${member.id}>: \`${minutes} phút\``);
+    }
+
+    result += `\n**${roleName}** (${membersData.length}):\n`;
+    result += membersData.length > 0 ? membersData.join("\n") : "👉 Trống\n";
   }
+
+  message.channel.send(result);
+}
+
 });
 
 // Reset dữ liệu mỗi ngày (0h)
